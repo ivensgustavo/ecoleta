@@ -21,7 +21,14 @@ class PointsController {
       .distinct()//Pra não retornar o mesmo valor duas vezes
       .select('points.*');//retornar apenas os dados da tabela points e não de todo o join
 
-    return response.json(points);
+      const serializedPoints = points.map(point => {
+        return {
+          ...point,
+          image_url: `http://192.168.100.6:3333/uploads/${point.image}`
+        };
+      });
+
+    return response.json(serializedPoints);
   }
 
   async show(request: Request, response: Response){
@@ -33,12 +40,17 @@ class PointsController {
       return response.status(400).json({message: 'Point id is invalid.'});
     }
 
+    const serializedPoint = {
+        ...point,
+        image_url: `http://192.168.100.6:3333/uploads/${point.image}`
+      };
+    
     const items = await knex('items')
       .join('point_items', 'items.id', '=', 'point_items.item_id')
       .where('point_items.point_id', '=', id)
       .select('items.title');
 
-    return response.json({point, items});
+    return response.json({point:serializedPoint, items});
   }
 
   async create(request: Request, response: Response) {
@@ -56,7 +68,7 @@ class PointsController {
   const trx = await knex.transaction();
 
   const point = {
-    image: 'ilustrative-image',
+    image: request.file.filename,
     name,
     email,
     whatsapp,
@@ -69,10 +81,14 @@ class PointsController {
   const insertedIds = await trx('points').insert(point);
 
   const point_id = insertedIds[0];
-  const pointItems = items.map((item_id: number) => {
-    return {
-      point_id,
-      item_id,
+  
+  const pointItems = items
+    .split(',')
+    .map((item: string) => Number(item.trim()))
+    .map((item_id: number) => {
+      return {
+        point_id,
+        item_id,
     }
   })
 
